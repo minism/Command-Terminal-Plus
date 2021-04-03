@@ -37,8 +37,8 @@ namespace CommandTerminalPlus
             }
         }
 
-        static readonly string[] TrueStrings = { "true", "yes", "y", "on" };
-        static readonly string[] FalseStrings = { "false", "no", "n", "off" };
+        static readonly string[] TrueStrings = { "true", "yes", "y", "on", "1" };
+        static readonly string[] FalseStrings = { "false", "no", "n", "off", "0" };
 
         public bool Bool
         {
