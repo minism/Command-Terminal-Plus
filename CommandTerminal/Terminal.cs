@@ -102,7 +102,6 @@ namespace CommandTerminalPlus
             var text = string.Format(format, message);
             Buffer.HandleLog(text, type);
             BottomOutScrollbar();
-            History.Push(text);
         }
 
         private CursorLockMode PreviousCursorLockState;
@@ -390,6 +389,7 @@ namespace CommandTerminalPlus
 
         void EnterCommand() {
             Shell.RunCommand(command_text);
+            History.Push(command_text);
 
             if (IssuedError) {
                 Log(TerminalLogType.Error, "Error: {0}", Shell.IssuedErrorMessage);
