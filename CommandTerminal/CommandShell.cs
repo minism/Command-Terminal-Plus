@@ -41,47 +41,42 @@ namespace CommandTerminalPlus
                         var attribute = Attribute.GetCustomAttribute(
                             method, typeof(RegisterCommandAttribute)) as RegisterCommandAttribute;
 
-                        if (attribute == null)
-                        {
-                            if (method.Name.StartsWith("FRONTCOMMAND", StringComparison.CurrentCultureIgnoreCase))
-                            {
-                                // Front-end Command methods don't implement RegisterCommand, use default attribute
-                                attribute = new RegisterCommandAttribute();
-                            }
-                            else
-                            {
-                                continue;
-                            }
-                        }
+                        if (attribute == null) continue;
 
                         var methods_params = method.GetParameters();
-
-                        string command_name = InferFrontCommandName(method.Name);
+                        string command_name = attribute.Name == null ? InferCommandName(method.Name) : attribute.Name;
                         Action<CommandArg[]> proc;
 
-                        if (attribute.Name == null)
-                        {
-                            // Use the method's name as the command's name
-                            command_name = InferCommandName(command_name == null ? method.Name : command_name);
+                        if (methods_params.Length == 1 && methods_params[0].ParameterType == typeof(CommandArg[])) {
+                            // Convert MethodInfo to Action.
+                            // This is essentially allows us to store a reference to the method,
+                            // which makes calling the method significantly more performant than using MethodInfo.Invoke().
+                            proc = (Action<CommandArg[]>)Delegate.CreateDelegate(typeof(Action<CommandArg[]>), method);
+                            AddCommand(command_name, proc, attribute.MinArgCount, attribute.MaxArgCount, attribute.Help, attribute.Usage, attribute.Secret);
+                        } else if (methods_params.Length == 0) {
+                            var del = (Action)Delegate.CreateDelegate(typeof(Action), method);
+                            proc = (commandArg) => del();
+                            AddCommand(command_name, proc, 0, 0, attribute.Help, attribute.Usage, attribute.Secret);
+                        } else if (methods_params.Length == 1) {
+                            // Make an anonymous convenience wrapper to call the function.
+                            // Assume input is string and make a wrapper for convenience.
+                            var del = DelegateHelper.MagicMethod1(method);
+                            proc = (commandArg) => {
+                              del(commandArg[0].ValueForType(methods_params[0].ParameterType));
+                            };
+                            AddCommand(command_name, proc, 1, 1, attribute.Help, attribute.Usage, attribute.Secret);
+                        } else if (methods_params.Length == 2) {
+                            // Make an anonymous convenience wrapper to call the function.
+                            // Assume input is string and make a wrapper for convenience.
+                            var del = DelegateHelper.MagicMethod2(method);
+                            proc = (commandArg) => {
+                              del(commandArg[0].ValueForType(methods_params[0].ParameterType),
+                                  commandArg[1].ValueForType(methods_params[1].ParameterType));
+                            };
+                            AddCommand(command_name, proc, 2, 2, attribute.Help, attribute.Usage, attribute.Secret);
+                        } else {
+                            IssueErrorMessage("{0} has no compatible signature.", command_name);
                         }
-                        else
-                        {
-                            command_name = attribute.Name;
-                        }
-
-                        if (methods_params.Length != 1 || methods_params[0].ParameterType != typeof(CommandArg[]))
-                        {
-                            // Method does not match expected Action signature,
-                            // this could be a command that has a FrontCommand method to handle its arguments.
-                            rejected_commands.Add(command_name.ToUpper(), CommandFromParamInfo(methods_params, attribute.Help));
-                            continue;
-                        }
-
-                        // Convert MethodInfo to Action.
-                        // This is essentially allows us to store a reference to the method,
-                        // which makes calling the method significantly more performant than using MethodInfo.Invoke().
-                        proc = (Action<CommandArg[]>)Delegate.CreateDelegate(typeof(Action<CommandArg[]>), method);
-                        AddCommand(command_name, proc, attribute.MinArgCount, attribute.MaxArgCount, attribute.Help, attribute.Usage, attribute.Secret);
                     }
 
                     foreach (var property in type.GetProperties(property_flags))
@@ -104,7 +99,6 @@ namespace CommandTerminalPlus
                         }
                     }
                 }
-                HandleRejectedCommands(rejected_commands);
             }
         }
 
@@ -300,26 +294,6 @@ namespace CommandTerminalPlus
             }
 
             return command_name;
-        }
-
-        string InferFrontCommandName(string method_name) {
-            int index = method_name.IndexOf("FRONT", StringComparison.CurrentCultureIgnoreCase);
-            return index >= 0 ? method_name.Remove(index, 5) : null;
-        }
-
-        void HandleRejectedCommands(Dictionary<string, CommandInfo> rejected_commands) {
-            foreach (var command in rejected_commands) {
-                if (commands.ContainsKey(command.Key)) {
-                    commands[command.Key] = new CommandInfo() {
-                        proc = commands[command.Key].proc,
-                        min_arg_count = command.Value.min_arg_count,
-                        max_arg_count = command.Value.max_arg_count,
-                        help = command.Value.help
-                    };
-                } else {
-                    IssueErrorMessage("{0} is missing a front command.", command);
-                }
-            }
         }
 
         CommandInfo CommandFromParamInfo(ParameterInfo[] parameters, string help) {

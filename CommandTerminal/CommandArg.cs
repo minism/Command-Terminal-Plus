@@ -72,6 +72,22 @@ namespace CommandTerminalPlus
             }
         }
 
+        public object ValueForType(Type type) {
+          switch (type) {
+            case Type t when t == typeof(string):
+              return String;
+            case Type t when t == typeof(int):
+              return Int;
+            case Type t when t == typeof(float):
+              return Float;
+            case Type t when t == typeof(bool):
+              return Bool;
+          }
+
+          // TODO: Handle this.
+          return null;
+        }
+
         public override string ToString() {
             return String;
         }
