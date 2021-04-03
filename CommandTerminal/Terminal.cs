@@ -16,6 +16,10 @@ namespace CommandTerminalPlus
 
     public class Terminal : MonoBehaviour
     {
+        [Header("Command behavior")]
+        [SerializeField]
+        bool treatVarsAsCommands;
+
         [Header("Window")]
         [Range(0, 1)]
         [SerializeField]
@@ -200,7 +204,7 @@ namespace CommandTerminalPlus
             SetupInput();
             SetupLabels();
 
-            Shell.RegisterCommandsAndVariables();
+            Shell.RegisterCommandsAndVariables(treatVarsAsCommands);
 
             if (IssuedError) {
                 Log(TerminalLogType.Error, "Error: {0}", Shell.IssuedErrorMessage);

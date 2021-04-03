@@ -26,7 +26,7 @@ namespace CommandTerminalPlus
         /// Uses reflection to find all RegisterCommand and RegisterVariable attributes
         /// and adds them to the commands dictionary.
         /// </summary>
-        public void RegisterCommandsAndVariables()
+        public void RegisterCommandsAndVariables(bool treatVariablesAsCommands)
         {
             var rejected_commands = new Dictionary<string, CommandInfo>();
             var method_flags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
@@ -94,6 +94,14 @@ namespace CommandTerminalPlus
                         string variable_name = attribute.Name ?? property.Name;
 
                         AddVariable(variable_name, property);
+
+                        if (treatVariablesAsCommands) {
+                          // Create a command wrapper for the variable.
+                          Action<CommandArg[]> proc = (CommandArg[] args) => {
+                            SetVariable(variable_name, args[0].String);
+                          };
+                          AddCommand(variable_name, proc, 1, 1, $"Set {variable_name}");
+                        }
                     }
                 }
                 HandleRejectedCommands(rejected_commands);
