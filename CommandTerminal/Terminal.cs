@@ -19,6 +19,8 @@ namespace CommandTerminalPlus
         [Header("Command behavior")]
         [SerializeField]
         bool treatVarsAsCommands;
+        [SerializeField]
+        bool camelToUnderscore;
 
         [Header("Window")]
         [Range(0, 1)]
@@ -203,7 +205,7 @@ namespace CommandTerminalPlus
             SetupInput();
             SetupLabels();
 
-            Shell.RegisterCommandsAndVariables(treatVarsAsCommands);
+            Shell.RegisterCommandsAndVariables(treatVarsAsCommands, camelToUnderscore);
 
             if (IssuedError) {
                 Log(TerminalLogType.Error, "Error: {0}", Shell.IssuedErrorMessage);

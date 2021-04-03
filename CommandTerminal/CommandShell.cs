@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Reflection;
-using System.Collections;
+using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -26,7 +26,7 @@ namespace CommandTerminalPlus
         /// Uses reflection to find all RegisterCommand and RegisterVariable attributes
         /// and adds them to the commands dictionary.
         /// </summary>
-        public void RegisterCommandsAndVariables(bool treatVariablesAsCommands)
+        public void RegisterCommandsAndVariables(bool treatVariablesAsCommands, bool camelToUnderscore)
         {
             var rejected_commands = new Dictionary<string, CommandInfo>();
             var method_flags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
@@ -44,7 +44,7 @@ namespace CommandTerminalPlus
                         if (attribute == null) continue;
 
                         var methods_params = method.GetParameters();
-                        string command_name = attribute.Name == null ? InferCommandName(method.Name) : attribute.Name;
+                        string command_name = attribute.Name == null ? InferCommandName(method.Name, camelToUnderscore) : attribute.Name;
                         Action<CommandArg[]> proc;
 
                         if (methods_params.Length == 1 && methods_params[0].ParameterType == typeof(CommandArg[])) {
@@ -87,15 +87,20 @@ namespace CommandTerminalPlus
                         if (attribute == null) continue;
 
                         string variable_name = attribute.Name ?? property.Name;
+                        variable_name = camelToUnderscore ? AddUnderscoresToCamelCase(variable_name) : variable_name;
 
                         AddVariable(variable_name, property);
 
                         if (treatVariablesAsCommands) {
                           // Create a command wrapper for the variable.
                           Action<CommandArg[]> proc = (CommandArg[] args) => {
-                            SetVariable(variable_name, args[0].String);
+                            if (args.Length < 1) {
+                              Terminal.Log("{0}: {1}", variable_name.PadRight(16), GetVariable(variable_name));
+                            } else {
+                              SetVariable(variable_name, args[0].String);
+                            }
                           };
-                          AddCommand(variable_name, proc, 1, 1, $"Set {variable_name}");
+                          AddCommand(variable_name, proc, 0, 1, $"Set {variable_name}");
                         }
                     }
                 }
@@ -282,7 +287,7 @@ namespace CommandTerminalPlus
             IssuedErrorMessage = string.Format(format, message);
         }
 
-        string InferCommandName(string method_name) {
+        string InferCommandName(string method_name, bool camelToUnderscore) {
             string command_name;
             int index = method_name.IndexOf("COMMAND", StringComparison.CurrentCultureIgnoreCase);
 
@@ -293,24 +298,12 @@ namespace CommandTerminalPlus
                 command_name = method_name;
             }
 
-            return command_name;
+            return camelToUnderscore ? AddUnderscoresToCamelCase(command_name) : command_name;
         }
 
-        CommandInfo CommandFromParamInfo(ParameterInfo[] parameters, string help) {
-            int optional_args = 0;
-
-            foreach (var param in parameters) {
-                if (param.IsOptional) {
-                    optional_args += 1;
-                }
-            }
-
-            return new CommandInfo() {
-                proc = null,
-                min_arg_count = parameters.Length - optional_args,
-                max_arg_count = parameters.Length,
-                help = help
-            };
+        string AddUnderscoresToCamelCase(string original) {
+          return String.Concat(
+              original.Select((x,i) => i > 0 && char.IsUpper(x) ? "_" + x.ToString() : x.ToString()));
         }
 
         CommandArg EatArgument(ref string s) {
